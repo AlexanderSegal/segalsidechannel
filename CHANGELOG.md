@@ -5,6 +5,11 @@ All notable changes to nightwire (formerly sidechannel) will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.9] - 2026-03-01
+
+### Added
+- Diagnostic logging for WebSocket message delivery: envelope type tracking, frame counter in watchdog warnings
+
 ## [2.5.8] - 2026-03-01
 
 ### Fixed

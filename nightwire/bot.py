@@ -71,6 +71,7 @@ class SignalBot:
         self.restart_exit_code: Optional[int] = None  # Non-None = exit with this code after stop
         self._processed_messages = OrderedDict()  # Dedup: msg_hash -> timestamp
         self._last_ws_activity = 0.0  # monotonic timestamp of last websocket activity
+        self._ws_frames_received = 0  # Total WebSocket frames received (for diagnostics)
         self._watchdog_task: Optional[asyncio.Task] = None
         self._startup_notified = False  # True after "ready" message sent on first WS connect
 
@@ -1399,6 +1400,7 @@ Return ONLY valid JSON, no markdown code blocks, no explanation."""
                             "watchdog_ws_idle",
                             idle_seconds=int(idle_secs),
                             threshold=WS_STALE_THRESHOLD,
+                            ws_frames_total=self._ws_frames_received,
                         )
         except asyncio.CancelledError:
             pass
@@ -1440,6 +1442,7 @@ Return ONLY valid JSON, no markdown code blocks, no explanation."""
 
                     async for msg in ws:
                         self._last_ws_activity = _time.monotonic()
+                        self._ws_frames_received += 1
                         if msg.type == aiohttp.WSMsgType.TEXT:
                             try:
                                 data = json.loads(msg.data)
@@ -1477,6 +1480,12 @@ Return ONLY valid JSON, no markdown code blocks, no explanation."""
             source = envelope.get("source") or envelope.get("sourceNumber") or envelope.get("sourceUuid")
             message_text = None
             attachments_list = []
+
+            # Log envelope type for diagnostics (helps debug message delivery issues)
+            envelope_types = [k for k in envelope if k.endswith("Message") or k == "dataMessage"]
+            if envelope_types:
+                logger.debug("envelope_received", types=envelope_types,
+                             source="..." + source[-4:] if source else "unknown")
 
             # Check for regular data message (from others TO us)
             data_message = envelope.get("dataMessage")
