@@ -45,15 +45,14 @@ RUN ARCH=$(uname -m) && \
         "https://raw.githubusercontent.com/bbernhard/signal-cli-rest-api/master/ext/libraries/libsignal-client/v${LIBSIGNAL_VERSION}/${LIB_ARCH}/libsignal_jni.so" \
         -o "/opt/signal-cli-${SIGNAL_CLI_VERSION}/lib/libsignal_jni.so"
 
-# Upgrade Turasa JARs (_137 -> _138)
+# Upgrade Turasa JARs (_137 -> _138) from bundled copies
+COPY patches/signal-cli/jars/ /tmp/jars/
 RUN LIB_DIR="/opt/signal-cli-${SIGNAL_CLI_VERSION}/lib" && \
     for artifact in signal-service-java models-jvm util-jvm; do \
         old_jar="$LIB_DIR/${artifact}-${TURASA_OLD}.jar"; \
         new_jar="$LIB_DIR/${artifact}-${TURASA_VERSION}.jar"; \
         if [ -f "$old_jar" ] && [ ! -f "$new_jar" ]; then \
-            curl -sfL \
-                "https://jitpack.io/com/github/niccokunzmann/${artifact}/${TURASA_VERSION}/${artifact}-${TURASA_VERSION}.jar" \
-                -o "$new_jar" && \
+            cp "/tmp/jars/${artifact}-${TURASA_VERSION}.jar" "$new_jar" && \
             mv "$old_jar" "${old_jar}.old"; \
         fi; \
     done
@@ -85,7 +84,7 @@ RUN rm -rf /opt/signal-cli-0.13.23 && \
     cp -a "/opt/signal-cli-${SIGNAL_CLI_VERSION}" /opt/signal-cli-0.13.23
 
 # Clean up
-RUN rm -rf /tmp/patches "/opt/signal-cli-${SIGNAL_CLI_VERSION}"
+RUN rm -rf /tmp/patches /tmp/jars "/opt/signal-cli-${SIGNAL_CLI_VERSION}"
 
 # Set Java library path for the patched native libraries
 ENV JAVA_OPTS="-Djava.library.path=/opt/signal-cli-0.13.23/lib"

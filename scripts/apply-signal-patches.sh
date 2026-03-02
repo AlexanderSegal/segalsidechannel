@@ -25,7 +25,7 @@ SIGNAL_CLI_VERSION="0.13.24"
 TURASA_VERSION="2.15.3_unofficial_138"
 TURASA_OLD="2.15.3_unofficial_137"
 LIBSIGNAL_VERSION="0.87.0"
-PATCH_VERSION="4"  # Bump when patch logic changes
+PATCH_VERSION="5"  # Bump when patch logic changes
 PATCH_REQUIRED=true
 
 # Turasa JARs to upgrade (groupId:artifactId)
@@ -34,9 +34,6 @@ TURASA_JARS=(
     "com.github.niccokunzmann:models-jvm"
     "com.github.niccokunzmann:util-jvm"
 )
-
-# Maven repository for Turasa JARs
-TURASA_MAVEN="https://jitpack.io/com/github/niccokunzmann"
 
 # ---------------------------------------------------------------------------
 # Resolve install directory
@@ -182,17 +179,23 @@ done
 if [ "$needs_jar_upgrade" = true ]; then
     echo -ne "  Upgrading Turasa JARs (${TURASA_OLD} → ${TURASA_VERSION})..."
 
+    jar_src="$PATCH_SRC/jars"
+    if [ ! -d "$jar_src" ]; then
+        fail "Bundled JARs not found at $jar_src"
+        exit 1
+    fi
+
     for spec in "${TURASA_JARS[@]}"; do
         artifact=$(echo "$spec" | cut -d: -f2)
         old_jar="$lib_dir/${artifact}-${TURASA_OLD}.jar"
         new_jar="$lib_dir/${artifact}-${TURASA_VERSION}.jar"
 
         if [ -f "$old_jar" ] && [ ! -f "$new_jar" ]; then
-            url="${TURASA_MAVEN}/${artifact}/${TURASA_VERSION}/${artifact}-${TURASA_VERSION}.jar"
-            if ! curl -sfL "$url" -o "$new_jar" 2>/dev/null; then
-                fail "Failed to download ${artifact}-${TURASA_VERSION}.jar"
+            if [ ! -f "$jar_src/${artifact}-${TURASA_VERSION}.jar" ]; then
+                fail "Missing bundled JAR: ${artifact}-${TURASA_VERSION}.jar"
                 exit 1
             fi
+            cp "$jar_src/${artifact}-${TURASA_VERSION}.jar" "$new_jar"
 
             # Keep old JAR as backup
             mv "$old_jar" "${old_jar}.old" 2>/dev/null || true
