@@ -133,39 +133,69 @@ fi
 info "signal-cli ${SIGNAL_CLI_VERSION}"
 
 # ---------------------------------------------------------------------------
-# Step 2: Download native library for this architecture
+# Step 2: Ensure native library for this architecture
 # ---------------------------------------------------------------------------
 ARCH=$(uname -m)
-lib_ext="so"
+IS_DARWIN=false
+[ "$(uname)" = "Darwin" ] && IS_DARWIN=true
+
 case "$ARCH" in
-    aarch64)       LIB_ARCH="arm64" ;;
-    arm64)         LIB_ARCH="arm64"; [ "$(uname)" = "Darwin" ] && lib_ext="dylib" ;;
-    x86_64|amd64)  LIB_ARCH="x86-64" ;;
+    aarch64)       LIB_ARCH="arm64";  JNI_NAME="libsignal_jni_aarch64.so" ;;
+    arm64)
+        LIB_ARCH="arm64"
+        if [ "$IS_DARWIN" = true ]; then
+            JNI_NAME="libsignal_jni_aarch64.dylib"
+        else
+            JNI_NAME="libsignal_jni_aarch64.so"
+        fi
+        ;;
+    x86_64|amd64)  LIB_ARCH="x86-64"; JNI_NAME="libsignal_jni_amd64.so" ;;
     *)
         fail "Unsupported architecture: $ARCH"
         exit 1
         ;;
 esac
 
-lib_path="$SIGNAL_CLI_DIR/lib/libsignal_jni.${lib_ext}"
-if [ ! -f "$lib_path" ] || ([ "$(uname)" = "Linux" ] && [ "$LIB_ARCH" = "arm64" ]); then
-    echo -ne "  Downloading native library (${LIB_ARCH})..."
-    lib_url="https://raw.githubusercontent.com/bbernhard/signal-cli-rest-api/master/ext/libraries/libsignal-client/v${LIBSIGNAL_VERSION}/${LIB_ARCH}/libsignal_jni.${lib_ext}"
-    lib_ok=false
-    for attempt in 1 2 3; do
-        if curl -sfL --retry 2 --connect-timeout 15 "$lib_url" -o "$lib_path" 2>/dev/null; then
-            lib_ok=true
-            break
+lib_dir="$SIGNAL_CLI_DIR/lib"
+lib_jar="$lib_dir/libsignal-client-${LIBSIGNAL_VERSION}.jar"
+
+# On macOS the native dylib is already inside the libsignal-client JAR;
+# extract it rather than downloading from bbernhard (who only ships .so).
+if [ "$IS_DARWIN" = true ] && [ -f "$lib_jar" ]; then
+    lib_path="$lib_dir/libsignal_jni.dylib"
+    if [ ! -f "$lib_path" ]; then
+        echo -ne "  Extracting native library from JAR (${LIB_ARCH})..."
+        if unzip -jo "$lib_jar" "$JNI_NAME" -d "$lib_dir" >/dev/null 2>&1 && \
+           mv "$lib_dir/$JNI_NAME" "$lib_path" 2>/dev/null; then
+            echo -e " ${GREEN}done${NC}"
+        else
+            rm -f "$lib_path" "$lib_dir/$JNI_NAME"
+            fail "Failed to extract $JNI_NAME from $lib_jar"
+            exit 1
         fi
-        [ "$attempt" -lt 3 ] && sleep 2
-    done
-    if [ "$lib_ok" = false ]; then
-        rm -f "$lib_path"
-        fail "Failed to download native library after 3 attempts"
-        fail "URL: $lib_url"
-        exit 1
     fi
-    echo -e " ${GREEN}done${NC}"
+else
+    # Linux: download from bbernhard's repo
+    lib_path="$lib_dir/libsignal_jni.so"
+    if [ ! -f "$lib_path" ] || [ "$LIB_ARCH" = "arm64" ]; then
+        echo -ne "  Downloading native library (${LIB_ARCH})..."
+        lib_url="https://raw.githubusercontent.com/bbernhard/signal-cli-rest-api/master/ext/libraries/libsignal-client/v${LIBSIGNAL_VERSION}/${LIB_ARCH}/libsignal_jni.so"
+        lib_ok=false
+        for attempt in 1 2 3; do
+            if curl -sfL --retry 2 --connect-timeout 15 "$lib_url" -o "$lib_path" 2>/dev/null; then
+                lib_ok=true
+                break
+            fi
+            [ "$attempt" -lt 3 ] && sleep 2
+        done
+        if [ "$lib_ok" = false ]; then
+            rm -f "$lib_path"
+            fail "Failed to download native library after 3 attempts"
+            fail "URL: $lib_url"
+            exit 1
+        fi
+        echo -e " ${GREEN}done${NC}"
+    fi
 fi
 info "Native library (${LIB_ARCH})"
 
