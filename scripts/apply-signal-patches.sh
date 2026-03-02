@@ -25,7 +25,7 @@ SIGNAL_CLI_VERSION="0.13.24"
 TURASA_VERSION="2.15.3_unofficial_138"
 TURASA_OLD="2.15.3_unofficial_137"
 LIBSIGNAL_VERSION="0.87.0"
-PATCH_VERSION="6"  # Bump when patch logic changes
+PATCH_VERSION="7"  # Bump when patch logic changes
 PATCH_REQUIRED=true
 
 # Turasa JARs to upgrade (groupId:artifactId)
